@@ -1,15 +1,63 @@
 'use client';
 
+import React, { useState, useEffect, useMemo, use, useCallback } from 'react';
 import { useAuth, useProtectedRoute } from "@/hooks/use-auth/page";
 import ProtectedRoute from "@/components/protected-route/page";
 import { LogOut, User, BriefcaseBusiness, FileText, Clock, CheckCircle } from 'lucide-react';
+import { Document } from '@/utils/types/projects';
+import axiosClient from '@/lib/axios';
 
 export default function DashboardPage() {
     const { user, logout, loading } = useAuth();
-    // const { isAuthenticated } = useProtectedRoute('E');
+    const { isAuthenticated } = useProtectedRoute('E');
+    const [documents, setDocuments] = useState<Document[]>([]);
+    const [documentsLoading, setDocumentsLoading] = useState(true);
+    const [documentsError, setDocumentsError] = useState('');
 
     // console.log('Dashboard - Loading:', loading);
     // console.log('Dashboard - User:', user);
+
+    const fetchDocuments = useCallback(async () => {
+        if (!user) return;
+
+        try {
+            setDocumentsLoading(true);
+            setDocumentsError('');
+            let endPoint = '/documents';
+            if (user?.level_user === 'E' && user.office?.id_offi) {
+                endPoint = `/documents?id_offi=${user.office.id_offi}`;
+            }
+
+            console.log('Fetching documents from:', endPoint);
+            console.log('User level:', user.level_user);
+            console.log('User office ID:', user.office?.id_offi);
+
+            const response = await axiosClient.get(endPoint);
+            console.log('Documents response:', response.data);
+
+            setDocuments(response.data as Document[]);
+        } catch (error) {
+            console.error('Error fetching documents:', error);
+            setDocumentsError('Error al cargar la lista de documentos');
+        } finally {
+            setDocumentsLoading(false);
+        }
+    }, [user]);
+
+    useEffect(() => {
+        if (isAuthenticated && user) {
+            if (user.level_user === 'E' && user.office?.id_offi) {
+                fetchDocuments();
+            } else if (user.level_user === 'A') {
+                fetchDocuments();
+            }
+        }
+    }, [isAuthenticated, user, fetchDocuments]);
+
+    const stats = useMemo(() => ({
+            totalDocuments: documents.length,
+            pendientes: documents.filter(d => d.status_env_doc === 'P').length,
+        }), [documents]);
 
     if (loading) {
         return (
@@ -55,14 +103,11 @@ export default function DashboardPage() {
                             <div className="flex items-center space-x-4">
                                 <div className="flex items-center space-x-2">
                                     <User className="h-8 w-8 text-green-600" />
-                                    <h1 className="text-xl font-semibold text-gray-900">Panel de Empleado</h1>
+                                    <h1 className="text-xl font-semibold text-gray-900">Panel del Funcionario</h1>
                                 </div>
                             </div>
                         
                             <div className="flex items-center space-x-4">
-                                {/* <span className="text-sm text-gray-600">
-                                    {user.name_user} {user.ape_pat_user}
-                                </span> */}
                                 <button
                                     onClick={logout}
                                     className="flex items-center gap-1 text-gray-500 hover:text-gray-700 transition-colors cursor-pointer">
@@ -90,7 +135,7 @@ export default function DashboardPage() {
                             <div className="flex items-center justify-between">
                                 <div>
                                     <p className="text-sm font-medium text-gray-600">Documentos Pendientes</p>
-                                    <p className="text-2xl font-bold text-gray-900">8</p>
+                                    <p className="text-2xl font-bold text-gray-900">{ stats.pendientes }</p>
                                 </div>
                                 <Clock className="h-8 w-8 text-orange-600" />
                             </div>
@@ -110,7 +155,7 @@ export default function DashboardPage() {
                             <div className="flex items-center justify-between">
                                 <div>
                                     <p className="text-sm font-medium text-gray-600">Total Documentos</p>
-                                    <p className="text-2xl font-bold text-gray-900">32</p>
+                                    <p className="text-2xl font-bold text-gray-900">{ stats.totalDocuments }</p>
                                 </div>
                                 <FileText className="h-8 w-8 text-blue-600" />
                             </div>
@@ -198,6 +243,73 @@ export default function DashboardPage() {
                                 </div>
                             </div>
                         </div>
+                    </div>
+
+                    {/* Document List */}
+                    <div className="bg-white rounded-lg shadow mt-8">
+                        <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                            <h3 className="text-lg font-semibold text-gray-900">Lista de Documentos</h3>
+                        </div>
+                        
+                        {documentsLoading ? (
+                            <div className="p-6 text-center">
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                                <p className="text-gray-600">Cargando documentos...</p>
+                            </div>
+                        ) : documentsError ? (
+                            <div className="p-6 text-center">
+                                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+                                    {documentsError}
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full divide-y divide-gray-200">
+                                    <thead className="bg-gray-50">
+                                        <tr>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Número de Expediente</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Creador</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Oficina</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="bg-white divide-y divide-gray-200">
+                                        {documents.map((document) => {
+                                            const filename = document.pdf_path.split('/').pop();
+                                            const pdfUrl = `http://localhost:8000/storage/documents/${filename}`;
+
+                                            return (
+                                                <tr key={document.id_doc} className="hover:bg-gray-50">
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                    {document.num_exp}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                    {document.creator.name_user} {document.creator.ape_pat_user} {document.creator.ape_mat_user}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                    {document.office.name_offi}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                                        document.status_env_doc === 'P' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
+                                                    }`}>
+                                                        {document.status_env_doc === 'P' ? 'Pendiente' : 'Inactivo'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                                    <div className="flex space-x-2">
+                                                        <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-900 bg-blue-100 hover:bg-blue-200 px-3 py-1 rounded text-xs font-medium transition-colors">Ver PDF</a>
+                                                        <a href={pdfUrl} download className="text-green-600 hover:text-green-900 bg-green-100 hover:bg-green-200 px-3 py-1 rounded text-xs font-medium transition-colors">Descargar</a>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
                     </div>
                 </main>
             </div>
