@@ -275,7 +275,8 @@ export default function DashboardPage() {
                         </div>
                     </div>
 
-                    {/* Recent Activity */}
+                    {/* Recent Activity
+
                     <div className="bg-white rounded-lg shadow p-6">
                         <h3 className="text-lg font-semibold text-gray-900 mb-4">Actividad Reciente</h3>
                         <div className="space-y-4">
@@ -304,6 +305,8 @@ export default function DashboardPage() {
                             </div>
                         </div>
                     </div>
+
+                    */}
 
                     {/* Document List */}
                     <div className="bg-white rounded-lg shadow mt-8">
@@ -381,8 +384,7 @@ export default function DashboardPage() {
                         <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto [box-shadow:var(--box-shadow)]">
                             <div className="flex justify-between items-center mb-4">
                                 <h3 className="text-lg font-semibold">Actualizar Trámite</h3>
-                                <button onClick={() => setShowUpdateDocumentModal(false)} 
-                                        className="text-gray-500 hover:text-gray-700 cursor-pointer">✕</button>
+                                <button onClick={() => setShowUpdateDocumentModal(false)} className="text-gray-500 hover:text-gray-700 cursor-pointer">✕</button>
                             </div>
                     
                             <form onSubmit={handleUpdateDocument} className="space-y-4">

@@ -46,15 +46,8 @@ export interface CreateUserRequest {
 }
 
 export interface UpdateUserRequest {
-    name_user?: string;
-    ape_pat_user?: string;
-    ape_mat_user?: string;
-    dni_user?: string;
     nick_user?: string;
     password?: string;
-    level_user?: UserRole;
-    id_offi?: string;
-    status_user?: UserStatus;
 }
 
 export interface LoginResponse {

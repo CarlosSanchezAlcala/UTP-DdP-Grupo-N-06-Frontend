@@ -28,6 +28,9 @@ export default function AdminDashboard() {
     const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
     const [showUpdateDocumentModal, setShowUpdateDocumentModal] = useState(false);
     const [isUpdatingDocument, setIsUpdatingDocument] = useState(false);
+    const [selectUser, setSelectUser] = useState<User | null>(null);
+    const [showUpdateUserModal, setShowUpdateUserModal] = useState(false);
+    const [isUpdatingUser, setIsUpdatingUser] = useState(false);
     
     // console.log('Dashboard - Loading:', loading);
     // console.log('Dashboard - User:', user);
@@ -152,6 +155,27 @@ export default function AdminDashboard() {
         }
     }
 
+    const updateUser = async (formData: FormData, userId:string) => {
+        try {
+            setIsUpdatingUser(true);
+            formData.append('_method', 'PUT');
+            const response = await axiosClient.post(`/users/${userId}`, formData, {
+                headers: {
+                    'Accept': 'application/json',
+                }
+            });
+            await fetchUsers();
+            setShowUpdateUserModal(false);
+            setSelectUser(null);
+            return response.data;
+        } catch (error) {
+            console.error('Error al actualizar usuario:', error);
+            throw error;
+        } finally {
+            setIsUpdatingUser(false);
+        }
+    }
+
     const stats = useMemo(() => ({
         totalUsers: users.length,
         admins: users.filter(u => u.level_user === 'A').length,
@@ -259,6 +283,23 @@ export default function AdminDashboard() {
     const openUpdateDocumentModal = (document: Document) => {
         setSelectedDocument(document);
         setShowUpdateDocumentModal(true);
+    }
+
+    const handleUpdateUser = async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        if (!selectUser) return;
+        try {
+            await updateUser(new FormData(e.currentTarget), String(selectUser.id_user));
+            alert('Usuario actualizado exitosamente');
+        } catch (error) {
+            console.error('Error al actualizar usuario:', error);
+            alert('Error al actualizar el usuario');
+        }
+    }
+
+    const openUpdateUserModal = (user: User) => {
+        setSelectUser(user);
+        setShowUpdateUserModal(true);
     }
 
     if (loading) {
@@ -402,6 +443,7 @@ export default function AdminDashboard() {
                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nivel</th>
                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Oficina</th>
                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
                                         </tr>
                                     </thead>
                                     <tbody className="bg-white divide-y divide-gray-200">
@@ -424,9 +466,7 @@ export default function AdminDashboard() {
                                                         </div>
                                                     </div>
                                                 </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                    {user.dni_user}
-                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.dni_user}</td>
                                                 <td className="px-6 py-4 whitespace-nowrap">
                                                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                                                         user.level_user === 'A' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
@@ -434,15 +474,18 @@ export default function AdminDashboard() {
                                                         {user.level_user === 'A' ? 'Administrador' : 'Empleado'}
                                                     </span>
                                                 </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                    {user.office.name_offi}
-                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.office.name_offi}</td>
                                                 <td className="px-6 py-4 whitespace-nowrap">
                                                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                                                         user.status_user === 'A' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                                                     }`}>
                                                         {user.status_user === 'A' ? 'Activo' : 'Inactivo'}
                                                     </span>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                                    <div className="flex space-x-2">                                                        
+                                                        <button onClick={() => openUpdateUserModal(user)} className="text-yellow-600 hover:text-yellow-900 bg-yellow-100 hover:bg-yellow-200 px-3 py-1 rounded text-xs font-medium transition-colors cursor-pointer">Editar</button>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         ))}
@@ -661,6 +704,7 @@ export default function AdminDashboard() {
                         )}
                     </div>
 
+                    {/* Modal to update documents */}
                     {showUpdateDocumentModal && selectedDocument && (
                     <div className="fixed inset-0 flex items-center justify-center z-50">
                         <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto [box-shadow:var(--box-shadow)]">
@@ -699,30 +743,64 @@ export default function AdminDashboard() {
                                 </div>
                                 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Nuevo Documento (PDF):
-                                    </label>
-                                    <input type="file" 
-                                        name="new_pdf" 
-                                        accept=".pdf,application/pdf" 
-                                        required 
-                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                                    <p className="text-xs text-gray-500 mt-1">
-                                        El nuevo PDF se fusionará con el documento existente. Máximo 10MB.
-                                    </p>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Nuevo Documento (PDF):</label>
+                                    <input type="file" name="new_pdf" accept=".pdf,application/pdf" required className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                    <p className="text-xs text-gray-500 mt-1">El nuevo PDF se fusionará con el documento existente. Máximo 10MB.</p>
                                 </div>
 
                                 <div className="flex space-x-3 pt-4">
-                                    <button type="button" 
-                                            onClick={() => setShowUpdateDocumentModal(false)} 
-                                            className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400">
-                                        Cancelar
-                                    </button>
-                                    <button type="submit" 
-                                            disabled={isUpdatingDocument} 
-                                            className="flex-1 bg-yellow-600 text-white py-2 rounded-lg hover:bg-yellow-700 disabled:bg-yellow-300">
-                                        {isUpdatingDocument ? 'Actualizando...' : 'Actualizar'}
-                                    </button>
+                                    <button type="button" onClick={() => setShowUpdateDocumentModal(false)} className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400">Cancelar</button>
+                                    <button type="submit" disabled={isUpdatingDocument} className="flex-1 bg-yellow-600 text-white py-2 rounded-lg hover:bg-yellow-700 disabled:bg-yellow-300">{isUpdatingDocument ? 'Actualizando...' : 'Actualizar'}</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                    )}
+
+                    {/* Modal to update users */}
+                    {showUpdateUserModal && selectUser && (
+                    <div className="fixed inset-0 flex items-center justify-center z-50">
+                        <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto [box-shadow:var(--box-shadow)]">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="text-lg font-semibold">Actualizar Usuario</h3>
+                                <button onClick={() => setShowUpdateUserModal(false)} className="text-gray-500 hover:text-gray-700 cursor-pointer">✕</button>
+                            </div>
+                    
+                            <form onSubmit={handleUpdateUser} className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Documento de Identidad:</label>
+                                    <input type="text" value={selectUser.dni_user} disabled className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-100 text-gray-500" />
+                                    <p className="text-xs text-gray-500 mt-1">El número de DNI no se puede modificar</p>
+                                </div>
+                                
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Nombres:</label>
+                                    <input type="text" value={selectUser.name_user} disabled className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-100 text-gray-500" />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Apellidos:</label>
+                                    <input type="text" value={`${selectUser.ape_pat_user} ${selectUser.ape_mat_user}`} disabled className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-100 text-gray-500" />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Oficina:</label>
+                                    <input type="text" value={selectUser.office.name_offi} disabled className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-100 text-gray-500" />
+                                </div>
+                                
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Usario:</label>
+                                    <input type="text" name="nick_user" defaultValue={selectUser.nick_user} className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-100 text-gray-700" />
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Contraseña:</label>
+                                    <input type="password" name="password" className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-100 text-gray-500" />
+                                </div>
+
+                                <div className="flex space-x-3 pt-4">
+                                    <button type="button" onClick={() => setShowUpdateUserModal(false)} className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400">Cancelar</button>
+                                    <button type="submit" disabled={isUpdatingDocument} className="flex-1 bg-yellow-600 text-white py-2 rounded-lg hover:bg-yellow-700 disabled:bg-yellow-300">{isUpdatingUser ? 'Actualizando...' : 'Actualizar'}</button>
                                 </div>
                             </form>
                         </div>
