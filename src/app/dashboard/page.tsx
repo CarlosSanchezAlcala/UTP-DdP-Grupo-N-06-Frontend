@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo, use, useCallback } from 'react';
 import { useAuth, useProtectedRoute } from "@/hooks/use-auth/page";
 import ProtectedRoute from "@/components/protected-route/page";
 import { LogOut, User, BriefcaseBusiness, FileText, Clock, CheckCircle } from 'lucide-react';
-import { Document } from '@/utils/types/projects';
+import { Document, Office } from '@/utils/types/projects';
 import axiosClient from '@/lib/axios';
 
 export default function DashboardPage() {
@@ -13,6 +13,12 @@ export default function DashboardPage() {
     const [documents, setDocuments] = useState<Document[]>([]);
     const [documentsLoading, setDocumentsLoading] = useState(true);
     const [documentsError, setDocumentsError] = useState('');
+    const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
+    const [showUpdateDocumentModal, setShowUpdateDocumentModal] = useState(false);
+    const [isUpdatingDocument, setIsUpdatingDocument] = useState(false);
+    const [offices, setOffices] = useState<Office[]>([]);
+    const [officesLoading, setOfficesLoading] = useState(true);
+    const [officesError, setOfficesError] = useState('');
 
     // console.log('Dashboard - Loading:', loading);
     // console.log('Dashboard - User:', user);
@@ -44,15 +50,69 @@ export default function DashboardPage() {
         }
     }, [user]);
 
+    const fetchOffices = async () => {
+            try {
+                setOfficesLoading(true);
+                const response = await axiosClient.get('/offices');
+                setOffices(response.data as Office[]);
+            } catch (error) {
+                console.error('Error al cargar oficinas:', error);
+                setOfficesError('Error al cargar la lista de oficinas');
+            } finally {
+                setOfficesLoading(false);
+            }
+        }
+
+    const updateDocument = async (formData: FormData, documentId:string) => {
+            try {
+                setIsUpdatingDocument(true);
+                formData.append('_method', 'PUT');
+                const response = await axiosClient.post(`/documents/${documentId}`, formData, {
+                    headers: {
+                        'Accept': 'application/json',
+                    }
+                });
+                await fetchDocuments();
+                setShowUpdateDocumentModal(false);
+                setSelectedDocument(null);
+                return response.data;
+            } catch (error) {
+                console.error('Error al actualizar trámite:', error);
+                throw error;
+            } finally {
+                setIsUpdatingDocument(false);
+            }
+        }
+
     useEffect(() => {
         if (isAuthenticated && user) {
             if (user.level_user === 'E' && user.office?.id_offi) {
                 fetchDocuments();
+                fetchOffices();
             } else if (user.level_user === 'A') {
                 fetchDocuments();
+                fetchOffices();
             }
         }
     }, [isAuthenticated, user, fetchDocuments]);
+
+    const handleUpdateDocument = async (e: React.FormEvent<HTMLFormElement>) => {
+            e.preventDefault();
+            if (!selectedDocument) return;
+            const formData = new FormData(e.currentTarget);
+            try {
+                await updateDocument(formData, String(selectedDocument.id_doc));
+                alert('Trámite actualizado exitosamente');
+            } catch (error) {
+                console.error('Error al actualizar trámite:', error);
+                alert('Error al actualizar el trámite');
+            }
+        }
+    
+        const openUpdateDocumentModal = (document: Document) => {
+            setSelectedDocument(document);
+            setShowUpdateDocumentModal(true);
+        }
 
     const stats = useMemo(() => ({
             totalDocuments: documents.length,
@@ -267,8 +327,9 @@ export default function DashboardPage() {
                                 <table className="min-w-full divide-y divide-gray-200">
                                     <thead className="bg-gray-50">
                                         <tr>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Número de Expediente</th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Creador</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">N° Exp</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Creado por</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Enviado por</th>
                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Oficina</th>
                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
                                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
@@ -288,6 +349,9 @@ export default function DashboardPage() {
                                                     {document.creator.name_user} {document.creator.ape_pat_user} {document.creator.ape_mat_user}
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                    {document.updater.name_user} {document.updater.ape_pat_user} {document.updater.ape_mat_user}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                                     {document.office.name_offi}
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap">
@@ -299,8 +363,8 @@ export default function DashboardPage() {
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                                     <div className="flex space-x-2">
-                                                        <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-900 bg-blue-100 hover:bg-blue-200 px-3 py-1 rounded text-xs font-medium transition-colors">Ver PDF</a>
-                                                        <a href={pdfUrl} download className="text-green-600 hover:text-green-900 bg-green-100 hover:bg-green-200 px-3 py-1 rounded text-xs font-medium transition-colors">Descargar</a>
+                                                        <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-900 bg-blue-100 hover:bg-blue-200 px-3 py-1 rounded text-xs font-medium transition-colors">Ver</a>
+                                                        <button onClick={() => openUpdateDocumentModal(document)} className="text-yellow-600 hover:text-yellow-900 bg-yellow-100 hover:bg-yellow-200 px-3 py-1 rounded text-xs font-medium transition-colors cursor-pointer">Editar</button>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -311,6 +375,74 @@ export default function DashboardPage() {
                             </div>
                         )}
                     </div>
+
+                    {showUpdateDocumentModal && selectedDocument && (
+                    <div className="fixed inset-0 flex items-center justify-center z-50">
+                        <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto [box-shadow:var(--box-shadow)]">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="text-lg font-semibold">Actualizar Trámite</h3>
+                                <button onClick={() => setShowUpdateDocumentModal(false)} 
+                                        className="text-gray-500 hover:text-gray-700 cursor-pointer">✕</button>
+                            </div>
+                    
+                            <form onSubmit={handleUpdateDocument} className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Número de Expediente:
+                                    </label>
+                                    <input type="text" 
+                                        value={selectedDocument.num_exp} 
+                                        disabled 
+                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-100 text-gray-500" />
+                                    <p className="text-xs text-gray-500 mt-1">El número de expediente no se puede modificar</p>
+                                </div>
+                                
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Oficina:
+                                    </label>
+                                    <select name="id_offi" 
+                                            defaultValue={selectedDocument.office.id_offi} 
+                                            required 
+                                            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                        {offices.map((office) => (
+                                            <option key={office.id_offi} value={office.id_offi}>
+                                                {office.name_offi}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Nuevo Documento (PDF):
+                                    </label>
+                                    <input type="file" 
+                                        name="new_pdf" 
+                                        accept=".pdf,application/pdf" 
+                                        required 
+                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                    <p className="text-xs text-gray-500 mt-1">
+                                        El nuevo PDF se fusionará con el documento existente. Máximo 10MB.
+                                    </p>
+                                </div>
+
+                                <div className="flex space-x-3 pt-4">
+                                    <button type="button" 
+                                            onClick={() => setShowUpdateDocumentModal(false)} 
+                                            className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400">
+                                        Cancelar
+                                    </button>
+                                    <button type="submit" 
+                                            disabled={isUpdatingDocument} 
+                                            className="flex-1 bg-yellow-600 text-white py-2 rounded-lg hover:bg-yellow-700 disabled:bg-yellow-300">
+                                        {isUpdatingDocument ? 'Actualizando...' : 'Actualizar'}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                    )}
                 </main>
             </div>
         </ProtectedRoute>

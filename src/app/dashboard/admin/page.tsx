@@ -25,6 +25,9 @@ export default function AdminDashboard() {
     const [documentsError, setDocumentsError] = useState('');
     const [isCreatingDocument, setIsCreatingDocument] = useState(false);
     const [showCreateDocumentModal, setShowCreateDocumentModal] = useState(false);
+    const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
+    const [showUpdateDocumentModal, setShowUpdateDocumentModal] = useState(false);
+    const [isUpdatingDocument, setIsUpdatingDocument] = useState(false);
     
     // console.log('Dashboard - Loading:', loading);
     // console.log('Dashboard - User:', user);
@@ -128,6 +131,27 @@ export default function AdminDashboard() {
         }
     }
 
+    const updateDocument = async (formData: FormData, documentId:string) => {
+        try {
+            setIsUpdatingDocument(true);
+            formData.append('_method', 'PUT');
+            const response = await axiosClient.post(`/documents/${documentId}`, formData, {
+                headers: {
+                    'Accept': 'application/json',
+                }
+            });
+            await fetchDocuments();
+            setShowUpdateDocumentModal(false);
+            setSelectedDocument(null);
+            return response.data;
+        } catch (error) {
+            console.error('Error al actualizar trámite:', error);
+            throw error;
+        } finally {
+            setIsUpdatingDocument(false);
+        }
+    }
+
     const stats = useMemo(() => ({
         totalUsers: users.length,
         admins: users.filter(u => u.level_user === 'A').length,
@@ -217,6 +241,24 @@ export default function AdminDashboard() {
         } catch (error) {
             console.error('Error al crear trámite:', error);
         }
+    }
+
+    const handleUpdateDocument = async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        if (!selectedDocument) return;
+        const formData = new FormData(e.currentTarget);
+        try {
+            await updateDocument(formData, String(selectedDocument.id_doc));
+            alert('Trámite actualizado exitosamente');
+        } catch (error) {
+            console.error('Error al actualizar trámite:', error);
+            alert('Error al actualizar el trámite');
+        }
+    }
+
+    const openUpdateDocumentModal = (document: Document) => {
+        setSelectedDocument(document);
+        setShowUpdateDocumentModal(true);
     }
 
     if (loading) {
@@ -607,6 +649,7 @@ export default function AdminDashboard() {
                                                     <div className="flex space-x-2">
                                                         <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-900 bg-blue-100 hover:bg-blue-200 px-3 py-1 rounded text-xs font-medium transition-colors">Ver PDF</a>
                                                         <a href={pdfUrl} download className="text-green-600 hover:text-green-900 bg-green-100 hover:bg-green-200 px-3 py-1 rounded text-xs font-medium transition-colors">Descargar</a>
+                                                        <button onClick={() => openUpdateDocumentModal(document)} className="text-yellow-600 hover:text-yellow-900 bg-yellow-100 hover:bg-yellow-200 px-3 py-1 rounded text-xs font-medium transition-colors cursor-pointer">Editar</button>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -617,6 +660,74 @@ export default function AdminDashboard() {
                             </div>
                         )}
                     </div>
+
+                    {showUpdateDocumentModal && selectedDocument && (
+                    <div className="fixed inset-0 flex items-center justify-center z-50">
+                        <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto [box-shadow:var(--box-shadow)]">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="text-lg font-semibold">Actualizar Trámite</h3>
+                                <button onClick={() => setShowUpdateDocumentModal(false)} 
+                                        className="text-gray-500 hover:text-gray-700 cursor-pointer">✕</button>
+                            </div>
+                    
+                            <form onSubmit={handleUpdateDocument} className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Número de Expediente:
+                                    </label>
+                                    <input type="text" 
+                                        value={selectedDocument.num_exp} 
+                                        disabled 
+                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-100 text-gray-500" />
+                                    <p className="text-xs text-gray-500 mt-1">El número de expediente no se puede modificar</p>
+                                </div>
+                                
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Oficina:
+                                    </label>
+                                    <select name="id_offi" 
+                                            defaultValue={selectedDocument.office.id_offi} 
+                                            required 
+                                            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                        {offices.map((office) => (
+                                            <option key={office.id_offi} value={office.id_offi}>
+                                                {office.name_offi}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Nuevo Documento (PDF):
+                                    </label>
+                                    <input type="file" 
+                                        name="new_pdf" 
+                                        accept=".pdf,application/pdf" 
+                                        required 
+                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                    <p className="text-xs text-gray-500 mt-1">
+                                        El nuevo PDF se fusionará con el documento existente. Máximo 10MB.
+                                    </p>
+                                </div>
+
+                                <div className="flex space-x-3 pt-4">
+                                    <button type="button" 
+                                            onClick={() => setShowUpdateDocumentModal(false)} 
+                                            className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400">
+                                        Cancelar
+                                    </button>
+                                    <button type="submit" 
+                                            disabled={isUpdatingDocument} 
+                                            className="flex-1 bg-yellow-600 text-white py-2 rounded-lg hover:bg-yellow-700 disabled:bg-yellow-300">
+                                        {isUpdatingDocument ? 'Actualizando...' : 'Actualizar'}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                    )}
                 </main>
             </div>
         </ProtectedRoute>

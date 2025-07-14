@@ -69,6 +69,7 @@ export interface Document {
     num_exp: string;
     id_user: number;
     creator: UserBase;
+    updater: UserBase;
     id_offi: string;
     office: Office;
     pdf_path: string;
