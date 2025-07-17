@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, use, useCallback } from 'react';
 import { useAuth, useProtectedRoute } from "@/hooks/use-auth/page";
 import ProtectedRoute from "@/components/protected-route/page";
-import { LogOut, User, BriefcaseBusiness, FileText, Clock, CheckCircle } from 'lucide-react';
+import { LogOut, User, BriefcaseBusiness, FileText, Clock, CheckCircle, Plus } from 'lucide-react';
 import { Document, Office } from '@/utils/types/projects';
 import axiosClient from '@/lib/axios';
 
@@ -13,12 +13,16 @@ export default function DashboardPage() {
     const [documents, setDocuments] = useState<Document[]>([]);
     const [documentsLoading, setDocumentsLoading] = useState(true);
     const [documentsError, setDocumentsError] = useState('');
+    const [isCreatingDocument, setIsCreatingDocument] = useState(false);
+    const [showCreateDocumentModal, setShowCreateDocumentModal] = useState(false);
     const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
     const [showUpdateDocumentModal, setShowUpdateDocumentModal] = useState(false);
     const [isUpdatingDocument, setIsUpdatingDocument] = useState(false);
     const [offices, setOffices] = useState<Office[]>([]);
     const [officesLoading, setOfficesLoading] = useState(true);
     const [officesError, setOfficesError] = useState('');
+    const [createFileName, setCreateFileName] = useState("Seleccionar archivo PDF");
+    const [fileName, setFileName] = useState("Seleccionar archivo");
 
     // console.log('Dashboard - Loading:', loading);
     // console.log('Dashboard - User:', user);
@@ -63,6 +67,36 @@ export default function DashboardPage() {
             }
         }
 
+    const createDocument = async (formData: FormData) => {
+        try {
+            setIsCreatingDocument(true);
+
+            console.log('=== DEBUG FormData ===');
+            for (const pair of formData.entries()) {
+                console.log(pair[0], ':', pair[1]);
+                if (pair[1] instanceof File) {
+                    console.log(`  - File name: ${pair[1].name}`);
+                    console.log(`  - File size: ${pair[1].size} bytes`);
+                    console.log(`  - File type: ${pair[1].type}`);
+                }
+            }
+
+            const response = await axiosClient.post('/documents', formData, {
+                headers: {
+                    'Accept': 'application/json',
+                },
+            });
+            await fetchDocuments();
+            setShowCreateDocumentModal(false);
+            return response.data;
+        } catch (error) {
+            console.error('Error al crear trámite:', error);
+            throw error;
+        } finally {
+            setIsCreatingDocument(false);
+        }
+    }
+
     const updateDocument = async (formData: FormData, documentId:string) => {
             try {
                 setIsUpdatingDocument(true);
@@ -84,6 +118,35 @@ export default function DashboardPage() {
             }
         }
 
+    const changeDocumentStatus = async (documentId: string, newStatus: string, observations?:string) => {
+        try {
+            setIsUpdatingDocument(true);
+            const response = await axiosClient.post(`/documents/${documentId}/status`, {
+                new_status: newStatus,
+                observations: observations || ''
+            });
+            await fetchDocuments();
+            return response.data;
+        } catch (error) {
+            console.error('Error al cambiar el estado del documento:', error);
+            throw error;
+        } finally {
+            setIsUpdatingDocument(false);
+        }
+    }
+
+    const getDocumentTracking = async (documentId: string) => {
+        try {
+            const response = await axiosClient.get(`/documents/${documentId}/tracking`);
+            return response.data;
+        } catch (error) {
+            console.error('Error al obtener el seguimiento del documento:', error);
+            throw error;
+        } finally {
+            setIsUpdatingDocument(false);
+        }
+    }
+
     useEffect(() => {
         if (isAuthenticated && user) {
             if (user.level_user === 'E' && user.office?.id_offi) {
@@ -95,6 +158,37 @@ export default function DashboardPage() {
             }
         }
     }, [isAuthenticated, user, fetchDocuments]);
+
+    const handleCreateDocument = async (e: React.FormEvent<HTMLFormElement>) => {
+            e.preventDefault(); 
+            const formData = new FormData(e.currentTarget);
+            
+            const numExp = formData.get('num_exp') as string;
+            const idOffi = formData.get('id_offi') as string;
+            const pdfFile = formData.get('pdf_file') as File;
+    
+            console.log('Datos a enviar:');
+            console.log('num_exp:', numExp);
+            console.log('id_offi:', idOffi);
+            console.log('pdf_file:', pdfFile);
+    
+            console.log('FormData entries:');
+            for (const pair of formData.entries()) {
+                console.log(pair[0], pair[1]);
+            }
+    
+            if (!numExp || !idOffi || !pdfFile || pdfFile.size === 0) {
+                alert('Por favor, complete todos los campos y seleccione un archivo válido.');
+                return;
+            }
+    
+            try {
+                await createDocument(formData);
+                alert('Trámite creado exitosamente');
+            } catch (error) {
+                console.error('Error al crear trámite:', error);
+            }
+        }
 
     const handleUpdateDocument = async (e: React.FormEvent<HTMLFormElement>) => {
             e.preventDefault();
@@ -116,7 +210,7 @@ export default function DashboardPage() {
 
     const stats = useMemo(() => ({
             totalDocuments: documents.length,
-            pendientes: documents.filter(d => d.status_env_doc === 'P').length,
+            pendientes: documents.filter(d => d.status === 'P').length,
         }), [documents]);
 
     if (loading) {
@@ -275,43 +369,15 @@ export default function DashboardPage() {
                         </div>
                     </div>
 
-                    {/* Recent Activity
-
-                    <div className="bg-white rounded-lg shadow p-6">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Actividad Reciente</h3>
-                        <div className="space-y-4">
-                            <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-                                <FileText className="h-5 w-5 text-blue-600" />
-                                <div className="flex-1">
-                                    <p className="text-sm font-medium text-gray-900">Documento procesado</p>
-                                    <p className="text-xs text-gray-500">Hace 2 horas</p>
-                                </div>
-                            </div>
-                            
-                            <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-                                <Clock className="h-5 w-5 text-orange-600" />
-                                <div className="flex-1">
-                                    <p className="text-sm font-medium text-gray-900">Nuevo documento asignado</p>
-                                    <p className="text-xs text-gray-500">Hace 4 horas</p>
-                                </div>
-                            </div>
-                            
-                            <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-                                <CheckCircle className="h-5 w-5 text-green-600" />
-                                <div className="flex-1">
-                                    <p className="text-sm font-medium text-gray-900">Revisión completada</p>
-                                    <p className="text-xs text-gray-500">Ayer</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    */}
-
                     {/* Document List */}
                     <div className="bg-white rounded-lg shadow mt-8">
                         <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
                             <h3 className="text-lg font-semibold text-gray-900">Lista de Documentos</h3>
+                                <div className="flex justify-end space-x-2">
+                                    <button onClick={() => setShowCreateDocumentModal(true)} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 cursor-pointer">
+                                        <Plus className="h-4 w-4" />Nuevo Trámite
+                                    </button>
+                                </div>
                         </div>
                         
                         {documentsLoading ? (
@@ -345,23 +411,15 @@ export default function DashboardPage() {
 
                                             return (
                                                 <tr key={document.id_doc} className="hover:bg-gray-50">
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                    {document.num_exp}
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                    {document.creator.name_user} {document.creator.ape_pat_user} {document.creator.ape_mat_user}
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                    {document.updater.name_user} {document.updater.ape_pat_user} {document.updater.ape_mat_user}
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                    {document.office.name_offi}
-                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{document.num_exp}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{document.creator.name_user} {document.creator.ape_pat_user} {document.creator.ape_mat_user}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{document.updater?.name_user} {document.updater?.ape_pat_user} {document.updater?.ape_mat_user}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{document.office.name_offi}</td>
                                                 <td className="px-6 py-4 whitespace-nowrap">
                                                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                                        document.status_env_doc === 'P' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
+                                                        document.status === 'P' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
                                                     }`}>
-                                                        {document.status_env_doc === 'P' ? 'Pendiente' : 'Inactivo'}
+                                                        {document.status === 'P' ? 'Pendiente' : document.status === 'D' ? 'Derivado' : document.status === 'R' ? 'Revisión' : document.status === 'F' ? 'Finalizado' : document.status === 'E' ? 'Entregado' : 'Inactivo'}
                                                     </span>
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -379,71 +437,118 @@ export default function DashboardPage() {
                         )}
                     </div>
 
-                    {showUpdateDocumentModal && selectedDocument && (
-                    <div className="fixed inset-0 flex items-center justify-center z-50">
-                        <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto [box-shadow:var(--box-shadow)]">
-                            <div className="flex justify-between items-center mb-4">
-                                <h3 className="text-lg font-semibold">Actualizar Trámite</h3>
-                                <button onClick={() => setShowUpdateDocumentModal(false)} className="text-gray-500 hover:text-gray-700 cursor-pointer">✕</button>
-                            </div>
-                    
-                            <form onSubmit={handleUpdateDocument} className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Número de Expediente:
-                                    </label>
-                                    <input type="text" 
-                                        value={selectedDocument.num_exp} 
-                                        disabled 
-                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-100 text-gray-500" />
-                                    <p className="text-xs text-gray-500 mt-1">El número de expediente no se puede modificar</p>
+                    {/* Modal para crear trámites */}
+                    {showCreateDocumentModal && (
+                        <div className="fixed inset-0 flex items-center justify-center z-50">
+                            <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto [box-shadow:var(--box-shadow)]">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h3 className="text-lg font-semibold">Crear Nuevo Trámite</h3>
+                                    <button onClick={() => setShowCreateDocumentModal(false)} className="text-gray-500 hover:text-gray-700 cursor-pointer">✕</button>
                                 </div>
-                                
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Oficina:
-                                    </label>
-                                    <select name="id_offi" 
-                                            defaultValue={selectedDocument.office.id_offi} 
-                                            required 
-                                            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                        {offices.map((office) => (
-                                            <option key={office.id_offi} value={office.id_offi}>
-                                                {office.name_offi}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                                
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Nuevo Documento (PDF):
-                                    </label>
-                                    <input type="file" 
-                                        name="new_pdf" 
-                                        accept=".pdf,application/pdf" 
-                                        required 
-                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                                    <p className="text-xs text-gray-500 mt-1">
-                                        El nuevo PDF se fusionará con el documento existente. Máximo 10MB.
-                                    </p>
-                                </div>
+                        
+                                <form onSubmit={handleCreateDocument} className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Número de Expediente:</label>
+                                        <input type="text" name="num_exp" required className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                    </div>
+                                    
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Oficina:</label>
+                                        <select name="id_offi" required defaultValue={user?.id_offi || ''} className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                            <option value="">Seleccionar oficina</option>
+                                            {offices.map((office) => (
+                                                <option key={office.id_offi} value={office.id_offi}>
+                                                    {office.name_offi}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    
+                                    <div>
+                                        <label className="text-sm font-medium text-gray-700">Documento (PDF):</label>
+                                        <div>
+                                            <input type="file" name="pdf_file" accept=".pdf,application/pdf" id="create-upload" required className="hidden"
+                                                onChange={(e) => {
+                                                    const files = e.target.files;
+                                                    setCreateFileName(files && files[0] ? files[0].name : "Ningún archivo seleccionado");
+                                                }}
+                                            />
+                                            <label htmlFor="create-upload" className="w-full inline-block cursor-pointer border border-gray-300 rounded-lg px-3 py-2 text-gray-700 bg-white hover:bg-gray-50 focus:ring-2 focus:ring-blue-500">{createFileName}</label>
+                                        </div>
+                                        <p className="text-xs text-gray-500 mt-1">Solo archivos PDF. Máximo 10MB.</p>
+                                    </div>
 
-                                <div className="flex space-x-3 pt-4">
-                                    <button type="button" 
-                                            onClick={() => setShowUpdateDocumentModal(false)} 
-                                            className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400">
-                                        Cancelar
-                                    </button>
-                                    <button type="submit" 
-                                            disabled={isUpdatingDocument} 
-                                            className="flex-1 bg-yellow-600 text-white py-2 rounded-lg hover:bg-yellow-700 disabled:bg-yellow-300">
-                                        {isUpdatingDocument ? 'Actualizando...' : 'Actualizar'}
-                                    </button>
-                                </div>
-                            </form>
+                                    <div className="flex space-x-3 pt-4">
+                                        <button type="button" onClick={() => setShowCreateDocumentModal(false)} className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400">Cancelar</button>
+                                        <button type="submit" disabled={isCreatingDocument} className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:bg-blue-300"> {isCreatingDocument ? 'Creando...' : 'Crear Trámite'} </button>
+                                    </div>
+                                </form>
+                            </div>
                         </div>
-                    </div>
+                    )}
+
+                    {/* Modal to update documents */}
+                    {showUpdateDocumentModal && selectedDocument && (
+                        <div className="fixed inset-0 flex items-center justify-center z-50">
+                            <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto [box-shadow:var(--box-shadow)]">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h3 className="text-lg font-semibold">Actualizar Trámite</h3>
+                                    <button onClick={() => setShowUpdateDocumentModal(false)} 
+                                            className="text-gray-500 hover:text-gray-700 cursor-pointer">✕</button>
+                                </div>
+                        
+                                <form onSubmit={handleUpdateDocument} className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Número de Expediente:</label>
+                                        <input type="text" value={selectedDocument.num_exp} disabled className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-100 text-gray-500" />
+                                        <p className="text-xs text-gray-500 mt-1">El número de expediente no se puede modificar</p>
+                                    </div>
+                                    
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Oficina Actual:</label>
+                                        <input type="text" value={selectedDocument.office.name_offi} disabled className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-100 text-gray-500 mb-2" />
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Derivar a Oficina:</label>
+                                        <select name="id_offi" 
+                                                defaultValue={selectedDocument.office.id_offi} 
+                                                required 
+                                                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                            {offices.map((office) => (
+                                                <option key={office.id_offi} value={office.id_offi}>
+                                                    {office.name_offi}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <p className="text-xs text-blue-600 mt-1">Si cambias la oficina, el documento se derivará automáticamente</p>
+                                    </div>
+                                    
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Observaciones de la Derivación:</label>
+                                        <textarea name="observations" rows={3} placeholder="Motivo de la derivación..." className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                    </div>
+                                    
+                                    <div>
+                                        <label className="text-sm font-medium text-gray-700">Nuevo Documento (PDF):</label>
+                                        <div>
+                                            <input type="file" name="new_pdf" required accept=".pdf" id="upload" className="hidden"
+                                                onChange={(e) => {
+                                                    const files = e.target.files;
+                                                    setFileName(files && files[0] ? files[0].name : "Ningún archivo seleccionado");
+                                                }}
+                                            />
+                                            <label htmlFor="upload" className="w-full inline-block cursor-pointer border border-gray-300 rounded-lg px-3 py-2 text-gray-700 bg-white hover:bg-gray-50 focus:ring-2 focus:ring-blue-500">{fileName}</label>
+                                        </div>
+                                        <p className="text-xs text-gray-500 mt-1">Opcional: El nuevo PDF se fusionará con el documento existente. Máximo 10MB.</p>
+                                    </div>
+
+                                    <div className="flex space-x-3 pt-4">
+                                        <button type="button" onClick={() => setShowUpdateDocumentModal(false)} className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400">Cancelar</button>
+                                        <button type="submit" disabled={isUpdatingDocument} className="flex-1 bg-yellow-600 text-white py-2 rounded-lg hover:bg-yellow-700 disabled:bg-yellow-300">
+                                            {isUpdatingDocument ? 'Derivando...' : 'Derivar Documento'}
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
                     )}
                 </main>
             </div>

@@ -66,7 +66,7 @@ export interface Document {
     id_offi: string;
     office: Office;
     pdf_path: string;
-    status_env_doc: string;
+    status: string;
     status_doc: string;
 }
 
@@ -74,4 +74,31 @@ export interface CreateDocumentRequest {
     num_exp: string;
     id_offi: string;
     pdf_file: File;
+}
+
+export interface Derivation {
+    id: number;
+    document_id: number;
+    office_origin_id: string;
+    office_destination_id: string;
+    user_derives_id: number;
+    derivation_date: string;
+    observations: string;
+    document_status_at_derivation: string;
+    officeOrigin: Office;
+    officeDestination: Office;
+    userDeriver: UserBase;
+}
+
+export interface StatusHistory {
+    id: number;
+    document_id: number;
+    previous_status: string;
+    new_status: string;
+    office_id: string;
+    user_id: number;
+    change_date: string;
+    observations: string;
+    office: Office;
+    user: UserBase;
 }

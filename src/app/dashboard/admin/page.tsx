@@ -31,6 +31,8 @@ export default function AdminDashboard() {
     const [selectUser, setSelectUser] = useState<User | null>(null);
     const [showUpdateUserModal, setShowUpdateUserModal] = useState(false);
     const [isUpdatingUser, setIsUpdatingUser] = useState(false);
+    const [createFileName, setCreateFileName] = useState("Seleccionar archivo PDF");
+    const [fileName, setFileName] = useState("Seleccionar archivo");
     
     // console.log('Dashboard - Loading:', loading);
     // console.log('Dashboard - User:', user);
@@ -173,6 +175,35 @@ export default function AdminDashboard() {
             throw error;
         } finally {
             setIsUpdatingUser(false);
+        }
+    }
+
+    const changeDocumentStatus = async (documentId: string, newStatus: string, observations?:string) => {
+        try {
+            setIsUpdatingDocument(true);
+            const response = await axiosClient.post(`/documents/${documentId}/status`, {
+                new_status: newStatus,
+                observations: observations || ''
+            });
+            await fetchDocuments();
+            return response.data;
+        } catch (error) {
+            console.error('Error al cambiar el estado del documento:', error);
+            throw error;
+        } finally {
+            setIsUpdatingDocument(false);
+        }
+    }
+
+    const getDocumentTracking = async (documentId: string) => {
+        try {
+            const response = await axiosClient.get(`/documents/${documentId}/tracking`);
+            return response.data;
+        } catch (error) {
+            console.error('Error al obtener el seguimiento del documento:', error);
+            throw error;
+        } finally {
+            setIsUpdatingDocument(false);
         }
     }
 
@@ -412,13 +443,13 @@ export default function AdminDashboard() {
                             <div className="flex justify-end space-x-2">
                                 <button onClick={() => setShowCreateUserModal(true)} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 cursor-pointer">
                                 <Plus className="h-4 w-4" />Nuevo Usuario
-                            </button>
-                            <button onClick={() => setShowCreateOfficeModal(true)} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 cursor-pointer">
+                                </button>
+                                <button onClick={() => setShowCreateOfficeModal(true)} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 cursor-pointer">
                                 <Plus className="h-4 w-4" />Nueva Oficina
-                            </button>
-                            <button onClick={() => setShowCreateDocumentModal(true)} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 cursor-pointer">
+                                </button>
+                                <button onClick={() => setShowCreateDocumentModal(true)} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 cursor-pointer">
                                 <Plus className="h-4 w-4" />Nuevo Trámite
-                            </button>
+                                </button>
                             </div>
                         </div>
                         
@@ -489,6 +520,69 @@ export default function AdminDashboard() {
                                                 </td>
                                             </tr>
                                         ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Document List */}
+                    <div className="bg-white rounded-lg shadow mt-8">
+                        <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                            <h3 className="text-lg font-semibold text-gray-900">Lista de Documentos</h3>
+                        </div>
+                        
+                        {documentsLoading ? (
+                            <div className="p-6 text-center">
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                                <p className="text-gray-600">Cargando documentos...</p>
+                            </div>
+                        ) : documentsError ? (
+                            <div className="p-6 text-center">
+                                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+                                    {documentsError}
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full divide-y divide-gray-200">
+                                    <thead className="bg-gray-50">
+                                        <tr>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">N° Exp</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Creado por</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Enviado por</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Oficina</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="bg-white divide-y divide-gray-200">
+                                        {documents.map((document) => {
+                                            const filename = document.pdf_path.split('/').pop();
+                                            const pdfUrl = `http://localhost:8000/storage/documents/${filename}`;
+
+                                            return (
+                                                <tr key={document.id_doc} className="hover:bg-gray-50">
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{document.num_exp}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{document.creator.name_user} {document.creator.ape_pat_user} {document.creator.ape_mat_user}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{document.updater?.name_user} {document.updater?.ape_pat_user} {document.updater?.ape_mat_user}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{document.office.name_offi}</td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                                        document.status === 'P' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
+                                                    }`}>
+                                                        {document.status === 'P' ? 'Pendiente' : document.status === 'D' ? 'Derivado' : document.status === 'R' ? 'Revisión' : document.status === 'F' ? 'Finalizado' : document.status === 'E' ? 'Entregado' : 'Inactivo'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                                    <div className="flex space-x-2">
+                                                        <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-900 bg-blue-100 hover:bg-blue-200 px-3 py-1 rounded text-xs font-medium transition-colors">Ver</a>
+                                                        <button onClick={() => openUpdateDocumentModal(document)} className="text-yellow-600 hover:text-yellow-900 bg-yellow-100 hover:bg-yellow-200 px-3 py-1 rounded text-xs font-medium transition-colors cursor-pointer">Editar</button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            );
+                                        })}
                                     </tbody>
                                 </table>
                             </div>
@@ -611,7 +705,7 @@ export default function AdminDashboard() {
                                     
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1">Oficina:</label>
-                                        <select name="id_offi" required className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                        <select name="id_offi" required defaultValue={user?.id_offi || ''} className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
                                             <option value="">Seleccionar oficina</option>
                                             {offices.map((office) => (
                                                 <option key={office.id_offi} value={office.id_offi}>
@@ -622,8 +716,16 @@ export default function AdminDashboard() {
                                     </div>
                                     
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Documento:</label>
-                                        <input type="file" name="pdf_file" accept=".pdf,application/pdf" required className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                        <label className="text-sm font-medium text-gray-700">Documento (PDF):</label>
+                                        <div>
+                                            <input type="file" name="pdf_file" accept=".pdf,application/pdf" id="create-upload" required className="hidden"
+                                                onChange={(e) => {
+                                                    const files = e.target.files;
+                                                    setCreateFileName(files && files[0] ? files[0].name : "Ningún archivo seleccionado");
+                                                }}
+                                            />
+                                            <label htmlFor="create-upload" className="w-full inline-block cursor-pointer border border-gray-300 rounded-lg px-3 py-2 text-gray-700 bg-white hover:bg-gray-50 focus:ring-2 focus:ring-blue-500">{createFileName}</label>
+                                        </div>
                                         <p className="text-xs text-gray-500 mt-1">Solo archivos PDF. Máximo 10MB.</p>
                                     </div>
 
@@ -635,74 +737,6 @@ export default function AdminDashboard() {
                             </div>
                         </div>
                     )}
-
-                    {/* Document List */}
-                    <div className="bg-white rounded-lg shadow mt-8">
-                        <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-                            <h3 className="text-lg font-semibold text-gray-900">Lista de Documentos</h3>
-                        </div>
-                        
-                        {documentsLoading ? (
-                            <div className="p-6 text-center">
-                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                                <p className="text-gray-600">Cargando documentos...</p>
-                            </div>
-                        ) : documentsError ? (
-                            <div className="p-6 text-center">
-                                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-                                    {documentsError}
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="overflow-x-auto">
-                                <table className="min-w-full divide-y divide-gray-200">
-                                    <thead className="bg-gray-50">
-                                        <tr>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Número de Expediente</th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Creador</th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Oficina</th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="bg-white divide-y divide-gray-200">
-                                        {documents.map((document) => {
-                                            const filename = document.pdf_path.split('/').pop();
-                                            const pdfUrl = `http://localhost:8000/storage/documents/${filename}`;
-
-                                            return (
-                                                <tr key={document.id_doc} className="hover:bg-gray-50">
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                    {document.num_exp}
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                    {document.creator.name_user} {document.creator.ape_pat_user} {document.creator.ape_mat_user}
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                    {document.office.name_offi}
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap">
-                                                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                                        document.status_env_doc === 'P' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
-                                                    }`}>
-                                                        {document.status_env_doc === 'P' ? 'Pendiente' : 'Inactivo'}
-                                                    </span>
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                                    <div className="flex space-x-2">
-                                                        <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-900 bg-blue-100 hover:bg-blue-200 px-3 py-1 rounded text-xs font-medium transition-colors">Ver PDF</a>
-                                                        <a href={pdfUrl} download className="text-green-600 hover:text-green-900 bg-green-100 hover:bg-green-200 px-3 py-1 rounded text-xs font-medium transition-colors">Descargar</a>
-                                                        <button onClick={() => openUpdateDocumentModal(document)} className="text-yellow-600 hover:text-yellow-900 bg-yellow-100 hover:bg-yellow-200 px-3 py-1 rounded text-xs font-medium transition-colors cursor-pointer">Editar</button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-                    </div>
 
                     {/* Modal to update documents */}
                     {showUpdateDocumentModal && selectedDocument && (
@@ -743,8 +777,16 @@ export default function AdminDashboard() {
                                 </div>
                                 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Nuevo Documento (PDF):</label>
-                                    <input type="file" name="new_pdf" accept=".pdf,application/pdf" required className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                    <label className="text-sm font-medium text-gray-700">Nuevo Documento (PDF):</label>
+                                    <div>
+                                        <input type="file" name="new_pdf" accept=".pdf" id="upload" required className="hidden"
+                                            onChange={(e) => {
+                                                const files = e.target.files;
+                                                setFileName(files && files[0] ? files[0].name : "Ningún archivo seleccionado");
+                                            }}
+                                        />
+                                        <label htmlFor="upload" className="w-full inline-block cursor-pointer border border-gray-300 rounded-lg px-3 py-2 text-gray-700 bg-white hover:bg-gray-50 focus:ring-2 focus:ring-blue-500">{fileName}</label>
+                                    </div>
                                     <p className="text-xs text-gray-500 mt-1">El nuevo PDF se fusionará con el documento existente. Máximo 10MB.</p>
                                 </div>
 
