@@ -102,3 +102,21 @@ export interface StatusHistory {
     office: Office;
     user: UserBase;
 }
+
+export interface TrackingMovement {
+    id?: number;
+    status?: string;
+    new_status?: string;
+    observations?: string;
+    created_at: string;
+    office?: {
+        id_offi: number;
+        name_offi: string;
+    };
+    user?: {
+        id_user: number;
+        name_user: string;
+        ape_pat_user: string;
+        ape_mat_user: string;
+    };
+}

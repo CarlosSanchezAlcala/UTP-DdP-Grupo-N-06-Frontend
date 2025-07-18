@@ -147,6 +147,29 @@ export default function DashboardPage() {
         }
     }
 
+    type StatusKey = 'P' | 'D' | 'R' | 'F' | 'E';
+    const getStatusLabel = (status: string) => {
+        const statusMap: Record<StatusKey, string> = {
+            'P': 'Pendiente',
+            'D': 'Derivado',
+            'R': 'En Revisión',
+            'F': 'Finalizado',
+            'E': 'Entregado'
+        };
+        return statusMap[status as StatusKey] ?? 'Desconocido';
+    };
+
+    const getStatusColor = (status: string) => {
+        const colorMap = {
+            'P': 'bg-yellow-100 text-yellow-800',
+            'D': 'bg-blue-100 text-blue-800',
+            'R': 'bg-purple-100 text-purple-800',
+            'F': 'bg-green-100 text-green-800',
+            'E': 'bg-gray-100 text-gray-800'
+        };
+        return colorMap[status as StatusKey] || 'bg-gray-100 text-gray-800';
+    };
+
     useEffect(() => {
         if (isAuthenticated && user) {
             if (user.level_user === 'E' && user.office?.id_offi) {
@@ -211,6 +234,7 @@ export default function DashboardPage() {
     const stats = useMemo(() => ({
             totalDocuments: documents.length,
             pendientes: documents.filter(d => d.status === 'P').length,
+            derivados: documents.filter(d => d.status === 'D').length,
         }), [documents]);
 
     if (loading) {
@@ -298,8 +322,8 @@ export default function DashboardPage() {
                         <div className="bg-white rounded-lg shadow p-6">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-sm font-medium text-gray-600">Documentos Procesados</p>
-                                    <p className="text-2xl font-bold text-gray-900">24</p>
+                                    <p className="text-sm font-medium text-gray-600">Documentos Derivados</p>
+                                    <p className="text-2xl font-bold text-gray-900">{ stats.derivados }</p>
                                 </div>
                                 <CheckCircle className="h-8 w-8 text-green-600" />
                             </div>
